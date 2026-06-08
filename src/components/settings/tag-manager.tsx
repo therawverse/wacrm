@@ -21,7 +21,7 @@ import type { Tag } from '@/types';
 
 const PRESET_COLORS = [
   { name: 'Red', value: '#ef4444' },
-  { name: 'Orange', value: '#f97316' },
+  { name: 'Orange', value: '#b45309' },
   { name: 'Amber', value: '#f59e0b' },
   { name: 'Emerald', value: '#10b981' },
   { name: 'Cyan', value: '#06b6d4' },

@@ -367,6 +367,13 @@ html[data-theme="rose"] {
     color: oklch(0.48 0.12 68) !important;
   }
 
+  .hover\:text-amber-300:hover,
+  .hover\:text-amber-400:hover,
+  .hover\:text-yellow-400:hover,
+  .hover\:text-orange-400:hover {
+    color: oklch(0.42 0.11 68) !important;
+  }
+
   .bg-amber-500\/10,
   .bg-amber-500\/5,
   .bg-amber-400\/10,

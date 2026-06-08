@@ -15,7 +15,7 @@ export const LEAD_STAGE_COLORS: Record<LeadStage, string> = {
   DNP: '#64748b',
   Followup: '#3b82f6',
   'Meeting Scheduled': '#8b5cf6',
-  'Send Proposal': '#f97316',
+  'Send Proposal': '#b45309',
   Onboarded: '#22c55e',
   Rejected: '#ef4444',
 }
