@@ -24,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -60,14 +61,20 @@ type ImportSource = {
 type SourceForm = {
   id: string | null
   name: string
+  source_type: 'published_csv' | 'private_sheet'
   published_url: string
+  spreadsheet_id: string
+  sheet_range: string
   is_active: boolean
 }
 
 const emptySourceForm: SourceForm = {
   id: null,
   name: '',
+  source_type: 'published_csv',
   published_url: '',
+  spreadsheet_id: '',
+  sheet_range: 'Sheet1',
   is_active: true,
 }
 
@@ -95,14 +102,10 @@ export function ImportModal({
         sources?: ImportSource[]
         error?: string
       }
-      if (!response.ok) throw new Error(payload.error || 'Failed to load saved CSVs')
-      setSources(
-        (payload.sources ?? []).filter(
-          (source) => source.source_type === 'published_csv',
-        ),
-      )
+      if (!response.ok) throw new Error(payload.error || 'Failed to load saved sources')
+      setSources(payload.sources ?? [])
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load saved CSVs')
+      toast.error(error instanceof Error ? error.message : 'Failed to load saved sources')
     } finally {
       setSourcesLoading(false)
     }
@@ -164,12 +167,25 @@ export function ImportModal({
     setSourceForm({
       id: source.id,
       name: source.name,
+      source_type: source.source_type,
       published_url: source.published_url ?? '',
+      spreadsheet_id: source.spreadsheet_id ?? '',
+      sheet_range: source.sheet_range ?? 'Sheet1',
       is_active: source.is_active,
     })
   }
 
   function sourcePayload() {
+    if (sourceForm.source_type === 'private_sheet') {
+      return {
+        name: sourceForm.name.trim() || undefined,
+        source_type: 'private_sheet',
+        spreadsheet_id: normalizeSpreadsheetId(sourceForm.spreadsheet_id),
+        sheet_range: sourceForm.sheet_range.trim() || 'Sheet1',
+        is_active: sourceForm.is_active,
+      }
+    }
+
     return {
       name: sourceForm.name.trim() || undefined,
       source_type: 'published_csv',
@@ -195,13 +211,13 @@ export function ImportModal({
         source?: ImportSource
         error?: string
       }
-      if (!response.ok) throw new Error(payload.error || 'Failed to save CSV')
-      toast.success(sourceForm.id ? 'Saved CSV updated' : 'Saved CSV created')
+      if (!response.ok) throw new Error(payload.error || 'Failed to save source')
+      toast.success(sourceForm.id ? 'Saved source updated' : 'Saved source created')
       setSourceForm(emptySourceForm)
       if (importAfterSave && payload.source) await syncSource(payload.source)
       await loadSources()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save CSV')
+      toast.error(error instanceof Error ? error.message : 'Failed to save source')
     } finally {
       setSourceSaving(false)
     }
@@ -219,7 +235,7 @@ export function ImportModal({
         source?: ImportSource
         error?: string
       }
-      if (!response.ok) throw new Error(payload.error || 'Failed to update CSV')
+      if (!response.ok) throw new Error(payload.error || 'Failed to update source')
       if (payload.source) {
         setSources((current) =>
           current.map((item) => (item.id === source.id ? payload.source! : item)),
@@ -227,7 +243,7 @@ export function ImportModal({
       }
       toast.success(body.is_active ? 'Cron enabled' : 'Cron paused')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update CSV')
+      toast.error(error instanceof Error ? error.message : 'Failed to update source')
     } finally {
       setSourceActionId(null)
     }
@@ -260,12 +276,12 @@ export function ImportModal({
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string
       }
-      if (!response.ok) throw new Error(payload.error || 'Failed to delete CSV')
+      if (!response.ok) throw new Error(payload.error || 'Failed to delete source')
       setSources((current) => current.filter((item) => item.id !== source.id))
       if (sourceForm.id === source.id) setSourceForm(emptySourceForm)
-      toast.success('Saved CSV deleted')
+      toast.success('Saved source deleted')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete CSV')
+      toast.error(error instanceof Error ? error.message : 'Failed to delete source')
     } finally {
       setSourceActionId(null)
     }
@@ -275,19 +291,19 @@ export function ImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-slate-700 bg-slate-900 text-slate-200 sm:max-w-2xl">
+      <DialogContent className="max-h-[96vh] w-[min(78vw,104rem)] max-w-none overflow-y-auto overflow-x-hidden border-slate-700 bg-slate-900 p-5 text-slate-200 sm:max-w-none sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-white">Import Leads</DialogTitle>
           <DialogDescription className="text-slate-400">
-            Upload a CSV manually or save a published CSV URL for manual import
-            and cron.
+            Upload a CSV manually or save a published CSV URL or private Google
+            Sheet for manual import and cron.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="upload">
           <TabsList className="bg-slate-800">
             <TabsTrigger value="upload">CSV Upload</TabsTrigger>
-            <TabsTrigger value="saved">Saved CSV</TabsTrigger>
+            <TabsTrigger value="saved">Saved Sources</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="space-y-4">
@@ -331,10 +347,10 @@ export function ImportModal({
             </Button>
           </TabsContent>
 
-          <TabsContent value="saved" className="space-y-4">
-            <div className="grid gap-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="source-name">CSV name</Label>
+          <TabsContent value="saved" className="space-y-5 min-w-0">
+            <div className="grid gap-4 rounded-lg border border-slate-700 bg-slate-800/40 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="source-name">Source name</Label>
                 <Input
                   id="source-name"
                   value={sourceForm.name}
@@ -344,11 +360,34 @@ export function ImportModal({
                       name: event.target.value,
                     }))
                   }
-                  placeholder="Monthly lead CSV"
+                  placeholder="Monthly lead source"
                   className="border-slate-700 bg-slate-900 text-white"
                 />
               </div>
-              <div className="flex items-end gap-2">
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="source-type">Source type</Label>
+                <Select
+                  value={sourceForm.source_type}
+                  onValueChange={(value) =>
+                    setSourceForm((current) => ({
+                      ...current,
+                      source_type: value as SourceForm['source_type'],
+                    }))
+                  }
+                >
+                  <SelectTrigger
+                    id="source-type"
+                    className="w-full border-slate-700 bg-slate-900 text-white"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-slate-900 text-white">
+                    <SelectItem value="published_csv">Published CSV</SelectItem>
+                    <SelectItem value="private_sheet">Private Sheet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end gap-2 lg:col-span-2">
                 <Switch
                   checked={sourceForm.is_active}
                   onCheckedChange={(value) =>
@@ -360,56 +399,95 @@ export function ImportModal({
                 />
                 <Label className="pb-1 text-slate-300">Run in cron</Label>
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="source-published-url">Published CSV URL</Label>
-                <Input
-                  id="source-published-url"
-                  value={sourceForm.published_url}
-                  onChange={(event) =>
-                    setSourceForm((current) => ({
-                      ...current,
-                      published_url: event.target.value,
-                    }))
-                  }
-                  placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
-                  className="border-slate-700 bg-slate-900 text-white"
-                />
-              </div>
-              <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
-                {sourceForm.id && (
+              {sourceForm.source_type === 'published_csv' ? (
+                <div className="space-y-2 lg:col-span-2">
+                  <Label htmlFor="source-published-url">Published CSV URL</Label>
+                  <Input
+                    id="source-published-url"
+                    value={sourceForm.published_url}
+                    onChange={(event) =>
+                      setSourceForm((current) => ({
+                        ...current,
+                        published_url: event.target.value,
+                      }))
+                    }
+                    placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+                    className="border-slate-700 bg-slate-900 text-white"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="source-spreadsheet-id">Spreadsheet ID or URL</Label>
+                    <Input
+                      id="source-spreadsheet-id"
+                      value={sourceForm.spreadsheet_id}
+                      onChange={(event) =>
+                        setSourceForm((current) => ({
+                          ...current,
+                          spreadsheet_id: event.target.value,
+                        }))
+                      }
+                      placeholder="1AbCDefGhIjKlMnOpQrStUvWxYz"
+                      className="border-slate-700 bg-slate-900 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="source-sheet-range">Sheet range</Label>
+                    <Input
+                      id="source-sheet-range"
+                      value={sourceForm.sheet_range}
+                      onChange={(event) =>
+                        setSourceForm((current) => ({
+                          ...current,
+                          sheet_range: event.target.value,
+                        }))
+                      }
+                      placeholder="Sheet1"
+                      className="border-slate-700 bg-slate-900 text-white"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex flex-col gap-3 border-t border-slate-700 pt-2 lg:col-span-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-2">
+                  {sourceForm.id && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setSourceForm(emptySourceForm)}
+                      className="border-slate-700 text-slate-300"
+                    >
+                      <Plus className="size-4" />
+                      New
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
-                    variant="outline"
-                    onClick={() => setSourceForm(emptySourceForm)}
-                    className="border-slate-700 text-slate-300"
+                    disabled={sourceSaving}
+                    onClick={() => saveSource(false)}
+                    className="bg-primary text-primary-foreground"
                   >
-                    <Plus className="size-4" />
-                    New
+                    {sourceSaving ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Save className="size-4" />
+                    )}
+                    {sourceForm.id ? 'Update' : 'Create'}
                   </Button>
-                )}
-                <Button
-                  disabled={sourceSaving}
-                  onClick={() => saveSource(false)}
-                  className="bg-primary text-primary-foreground"
-                >
-                  {sourceSaving ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Save className="size-4" />
-                  )}
-                  {sourceForm.id ? 'Update' : 'Create'}
-                </Button>
-                <Button
-                  disabled={sourceSaving}
-                  onClick={() => saveSource(true)}
-                  className="bg-primary text-primary-foreground"
-                >
-                  {sourceSaving ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-4" />
-                  )}
-                  Save & Manual Import
-                </Button>
+                  <Button
+                    disabled={sourceSaving}
+                    onClick={() => saveSource(true)}
+                    className="bg-primary text-primary-foreground"
+                  >
+                    {sourceSaving ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                    Save & Manual Import
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -417,11 +495,11 @@ export function ImportModal({
               {sourcesLoading ? (
                 <div className="flex items-center gap-2 rounded-lg border border-slate-700 p-3 text-sm text-slate-400">
                   <Loader2 className="size-4 animate-spin" />
-                  Loading saved CSVs...
+                  Loading saved sources...
                 </div>
               ) : sources.length === 0 ? (
                 <div className="rounded-lg border border-slate-700 p-3 text-sm text-slate-400">
-                  No saved CSVs yet.
+                  No saved sources yet.
                 </div>
               ) : (
                 sources.map((source) => (
@@ -429,7 +507,7 @@ export function ImportModal({
                     key={source.id}
                     className="rounded-lg border border-slate-700 bg-slate-800/30 p-3"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-white">{source.name}</p>
@@ -439,12 +517,19 @@ export function ImportModal({
                                 ? 'rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300'
                                 : 'rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300'
                             }
-                          >
-                            {source.is_active ? 'Cron on' : 'Cron off'}
+                            >
+                              {source.is_active ? 'Cron on' : 'Cron off'}
+                            </span>
+                          <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-300">
+                            {source.source_type === 'published_csv'
+                              ? 'Published CSV'
+                              : 'Private Sheet'}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-slate-500">
-                          {source.published_url}
+                        <p className="mt-1 truncate text-xs text-slate-500" title={source.source_type === 'published_csv' ? source.published_url ?? '' : `${source.spreadsheet_id ?? ''}${source.sheet_range ? ` | ${source.sheet_range}` : ''}`}>
+                          {source.source_type === 'published_csv'
+                            ? source.published_url
+                            : `${source.spreadsheet_id ?? ''}${source.sheet_range ? ` | ${source.sheet_range}` : ''}`}
                         </p>
                         {source.last_synced_at && (
                           <p className="mt-1 text-xs text-slate-500">
@@ -454,7 +539,7 @@ export function ImportModal({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                         <Switch
                           checked={source.is_active}
                           disabled={sourceActionId === source.id}
@@ -539,6 +624,12 @@ export function ImportModal({
       </DialogContent>
     </Dialog>
   )
+}
+
+function normalizeSpreadsheetId(value: string) {
+  const trimmed = value.trim()
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
+  return match?.[1] ?? trimmed
 }
 
 function ImportPreview({ rows }: { rows: LeadImportRow[] }) {

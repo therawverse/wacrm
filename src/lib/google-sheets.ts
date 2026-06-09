@@ -6,7 +6,15 @@ export async function fetchPublishedSheetCsv(url: string): Promise<string> {
     throw new Error('Use a Google Sheets HTTPS URL from docs.google.com')
   }
   const response = await fetch(parsed, { cache: 'no-store' })
-  if (!response.ok) throw new Error(`Published sheet returned ${response.status}`)
+  if (!response.ok) {
+    const detail = await response.text()
+    console.error('[google-sheets] published sheet fetch failed', {
+      status: response.status,
+      url: parsed.toString(),
+      detail,
+    })
+    throw new Error(`Published sheet returned ${response.status}`)
+  }
   const text = await response.text()
   if (looksLikeHtml(text)) {
     throw new Error(
@@ -30,6 +38,12 @@ export async function fetchPrivateSheetCsv(
   })
   if (!response.ok) {
     const detail = await response.text()
+    console.error('[google-sheets] private sheet fetch failed', {
+      status: response.status,
+      spreadsheetId,
+      range,
+      detail,
+    })
     throw new Error(`Google Sheets API failed (${response.status}): ${detail}`)
   }
   const payload = (await response.json()) as { values?: unknown[][] }
@@ -71,9 +85,23 @@ async function getServiceAccountToken(): Promise<string> {
     }),
     cache: 'no-store',
   })
-  if (!response.ok) throw new Error('Google service-account authentication failed')
+  if (!response.ok) {
+    const detail = await response.text()
+    console.error('[google-sheets] service-account auth failed', {
+      status: response.status,
+      email,
+      detail,
+    })
+    throw new Error('Google service-account authentication failed')
+  }
   const payload = (await response.json()) as { access_token?: string }
-  if (!payload.access_token) throw new Error('Google did not return an access token')
+  if (!payload.access_token) {
+    console.error('[google-sheets] service-account auth returned no token', {
+      email,
+      payload,
+    })
+    throw new Error('Google did not return an access token')
+  }
   return payload.access_token
 }
 

@@ -55,35 +55,35 @@ export default function SettingsPage() {
         <TabsList className="bg-slate-900 border border-slate-700">
           <TabsTrigger
             value="profile"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+            className="data-active:bg-primary/10 data-active:text-primary text-slate-400"
           >
             <User className="size-4" />
             Profile
           </TabsTrigger>
           <TabsTrigger
             value="whatsapp"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+            className="data-active:bg-primary/10 data-active:text-primary text-slate-400"
           >
             <Settings className="size-4" />
             WhatsApp Config
           </TabsTrigger>
           <TabsTrigger
             value="templates"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+            className="data-active:bg-primary/10 data-active:text-primary text-slate-400"
           >
             <MessageSquare className="size-4" />
             Templates
           </TabsTrigger>
           <TabsTrigger
             value="tags"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+            className="data-active:bg-primary/10 data-active:text-primary text-slate-400"
           >
             <Tag className="size-4" />
             Tags
           </TabsTrigger>
           <TabsTrigger
             value="appearance"
-            className="data-active:bg-slate-800 data-active:text-primary text-slate-400"
+            className="data-active:bg-primary/10 data-active:text-primary text-slate-400"
           >
             <Palette className="size-4" />
             Appearance

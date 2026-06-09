@@ -19,7 +19,8 @@ type SourceResult = LeadImportResult & {
 }
 
 export async function GET(request: Request) {
-  const expected = process.env.GOOGLE_SHEETS_IMPORT_SECRET
+  const expected =
+    process.env.CRON_SECRET ?? process.env.GOOGLE_SHEETS_IMPORT_SECRET
   if (!expected) {
     return NextResponse.json({ error: 'Google Sheets sync is not configured' }, { status: 503 })
   }
@@ -86,19 +87,6 @@ export async function GET(request: Request) {
       })
     }
 
-    const privateSpreadsheetId =
-      process.env.GOOGLE_SHEETS_AUTO_PRIVATE_SPREADSHEET_ID?.trim()
-    if (privateSpreadsheetId) {
-      const range =
-        process.env.GOOGLE_SHEETS_AUTO_PRIVATE_RANGE?.trim() || 'Sheet1'
-      const csv = await fetchPrivateSheetCsv(privateSpreadsheetId, range)
-      const rows = parseLeadCsv(csv)
-      results.push({
-        source: 'private_sheet',
-        ...(await importLeadRows(admin, userId, rows)),
-      })
-    }
-
     if (results.length === 0) {
       return NextResponse.json(
         { error: 'No Google Sheets automatic import sources are configured' },
@@ -125,8 +113,7 @@ export async function GET(request: Request) {
 
 function hasEnvSources() {
   return Boolean(
-    process.env.GOOGLE_SHEETS_AUTO_PUBLISHED_URL?.trim() ||
-      process.env.GOOGLE_SHEETS_AUTO_PRIVATE_SPREADSHEET_ID?.trim(),
+    process.env.GOOGLE_SHEETS_AUTO_PUBLISHED_URL?.trim(),
   )
 }
 
@@ -146,9 +133,14 @@ function serializeSavedSourceResult(result: GoogleSheetSourceSyncResult) {
 }
 
 function isAuthorized(request: Request, expected: string) {
+  const authorization = request.headers.get('authorization') ?? ''
+  const bearer = authorization.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : ''
   const supplied =
-    request.headers.get('x-cron-secret') ??
-    new URL(request.url).searchParams.get('secret') ??
+    bearer ||
+    request.headers.get('x-cron-secret') ||
+    new URL(request.url).searchParams.get('secret') ||
     ''
   const suppliedBuf = Buffer.from(supplied)
   const expectedBuf = Buffer.from(expected)
