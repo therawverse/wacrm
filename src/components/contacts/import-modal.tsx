@@ -288,7 +288,7 @@ export function ImportModal({
   }
 
   const preview = rows.slice(0, 5)
-
+ 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[96vh] w-[min(78vw,104rem)] max-w-none overflow-y-auto overflow-x-hidden border-slate-700 bg-slate-900 p-5 text-slate-200 sm:max-w-none sm:p-6">
